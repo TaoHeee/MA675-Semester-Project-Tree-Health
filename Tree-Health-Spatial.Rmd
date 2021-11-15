@@ -99,11 +99,11 @@ kriging_smooth_spherical <- function (formula, data, ...) {
 ```{r }
 tract2<-st_centroid(tract) #Center the polygon
 tract2 = na.omit(tract2)
-#tract2$a = log(tract2$Asthma +1)
-#tract2$a = tract2$Asthma
+#tract2$a = exp(tract2$Asthma)
+tract2$a = log(tract2$Asthma)
 tm_shape(tract2) +
   tm_bubbles(col = "Asthma", palette = "-RdYlBu", size = .3, alpha = .5)
-v <- variogram(Asthma ~ 1, tract2)
+v <- variogram(a ~ 1, tract2)
 plot(v, plot.numbers = T)
 v_fit <- fit.variogram(v, vgm("Sph")) #'vgm':generate a variogram model or add to an existing model.
 v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
@@ -131,8 +131,8 @@ tract3
 tract4 <- tract3 %>% st_sf() %>% as_Spatial()
 
 # check smoothing
-ks <- kriging_smooth_spherical(Asthma ~ 1, tract4)
-y <- tract2$Asthma
+ks <- kriging_smooth_spherical(a ~ 1, tract4)
+y <- tract4$a
 op <- par(mfrow = c(1, 2))
 plot(ks$smooth, y); abline(0, 1, col = "red")
 plot(ks$smooth, type = "l", ylab = "y")
@@ -144,7 +144,7 @@ breaks <- seq(4.5, 8, by = .5)
 tmap_mode("plot")
 
 tmap_arrange(
-  tm_shape(tract2) +
+  tm_shape(tract4) +
     tm_bubbles(col = "Asthma", palette = "-RdYlBu", size = .3, breaks = breaks)
   #tm_shape(tract2) +
     #tm_bubbles(col = "smooth", palette = "-RdYlBu", size = .3, breaks = breaks)
@@ -153,7 +153,60 @@ tmap_arrange(
 ```
 
 
+```{r }
+tract2<-st_centroid(tract) #Center the polygon
+tract2 = na.omit(tract2)
+#tract2$a = exp(tract2$Asthma)
+tract2$b = log(tract2$Mental)
+tm_shape(tract2) +
+  tm_bubbles(col = "Mental", palette = "-RdYlBu", size = .3, alpha = .5)
+v <- variogram(b ~ 1, tract2)
+plot(v, plot.numbers = T)
+v_fit <- fit.variogram(v, vgm("Sph")) #'vgm':generate a variogram model or add to an existing model.
+v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
 
+# check variogram and covariance
+op <- par(mfrow = c(1, 2))
+h <- seq(0, 40000, length = 100)
+plot(v$dist, v$gamma,  pch = 19, col = "gray",
+     xlab = "distance", ylab = "semivariogram")
+lines(h, v_f(h))
+abline(v = v_fit$range[2], col = "gray")
+plot(h, sum(v_fit$psill) - v_f(h), type = "l",
+     xlab = "distance", ylab = "covariogram",
+     ylim = c(0, sum(v_fit$psill)))
+points(0, sum(v_fit$psill), pch = 19)
+abline(v = v_fit$range[2], col = "gray")
+par(op)
+
+#coordinates- x & y
+tract3 <- tract2 %>%
+    mutate(x = unlist(map(tract2$geometry,1)),
+           y = unlist(map(tract2$geometry,2)))
+tract3
+
+tract4 <- tract3 %>% st_sf() %>% as_Spatial()
+
+# check smoothing
+ks <- kriging_smooth_spherical(b ~ 1, tract4)
+y <- tract4$b
+op <- par(mfrow = c(1, 2))
+plot(ks$smooth, y); abline(0, 1, col = "red")
+plot(ks$smooth, type = "l", ylab = "y")
+points(y, pch = 19, col = "gray")
+abline(h = ks$prior_mean)
+par(op)
+tract2$smooth <- ks$smooth
+breaks <- seq(4.5, 8, by = .5)
+tmap_mode("plot")
+
+tmap_arrange(
+  tm_shape(tract4) +
+    tm_bubbles(col = "Mental", palette = "-RdYlBu", size = .3, breaks = breaks)
+  #tm_shape(tract2) +
+    #tm_bubbles(col = "smooth", palette = "-RdYlBu", size = .3, breaks = breaks)
+)
+```
 
 
 
