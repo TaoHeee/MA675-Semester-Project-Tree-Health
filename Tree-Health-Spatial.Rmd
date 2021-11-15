@@ -100,7 +100,7 @@ kriging_smooth_spherical <- function (formula, data, ...) {
 tract2<-st_centroid(tract) #Center the polygon
 tract2 = na.omit(tract2)
 #tract2$a = exp(tract2$Asthma)
-tract2$a = log(tract2$Asthma)
+tract2$a = log(tract2$Asthma) #The distribution is un-normal, so we use the log transformation here.
 tm_shape(tract2) +
   tm_bubbles(col = "Asthma", palette = "-RdYlBu", size = .3, alpha = .5)
 v <- variogram(a ~ 1, tract2)
@@ -131,6 +131,7 @@ tract3
 tract4 <- tract3 %>% st_sf() %>% as_Spatial()
 
 # check smoothing
+#We wanna to see the plots follow the assumption.
 ks <- kriging_smooth_spherical(a ~ 1, tract4)
 y <- tract4$a
 op <- par(mfrow = c(1, 2))
