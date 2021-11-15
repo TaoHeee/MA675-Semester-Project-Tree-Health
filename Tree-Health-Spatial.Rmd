@@ -98,12 +98,12 @@ kriging_smooth_spherical <- function (formula, data, ...) {
 
 ```{r }
 tract2<-st_centroid(tract) #Center the polygon
-tract2 = na.omit(tract)
+tract2 = na.omit(tract2)
 #tract2$a = log(tract2$Asthma +1)
 #tract2$a = tract2$Asthma
 tm_shape(tract2) +
   tm_bubbles(col = "Asthma", palette = "-RdYlBu", size = .3, alpha = .5)
-v <- variogram(a ~ 1, tract2)
+v <- variogram(Asthma ~ 1, tract2)
 plot(v, plot.numbers = T)
 v_fit <- fit.variogram(v, vgm("Sph")) #'vgm':generate a variogram model or add to an existing model.
 v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
@@ -131,8 +131,8 @@ tract3
 tract4 <- tract3 %>% st_sf() %>% as_Spatial()
 
 # check smoothing
-ks <- kriging_smooth_spherical(log.Asthma ~ 1, tract4)
-y <- tract2$log.Asthma
+ks <- kriging_smooth_spherical(Asthma ~ 1, tract4)
+y <- tract2$Asthma
 op <- par(mfrow = c(1, 2))
 plot(ks$smooth, y); abline(0, 1, col = "red")
 plot(ks$smooth, type = "l", ylab = "y")
