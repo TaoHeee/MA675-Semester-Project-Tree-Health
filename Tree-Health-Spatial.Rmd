@@ -1,0 +1,159 @@
+---
+title: "Tree-Health-Spatial-Nov."
+author: "Yongrong Chai"
+date: "11/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(sp) 
+library(gstat) 
+library(tmap)
+library(sf)
+library(tidyverse)
+library(magrittr)
+library(rgdal)
+```
+
+```{r}
+
+```
+
+
+```{r }
+health <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/PLACES_ Census Tract Data (GIS Friendly Format), 2020 release/geo_export_735ca527-23eb-442e-bbd4-4dacf4ff0a25.shp",quiet = TRUE)
+#censustract <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
+asthma <- health %>% dplyr::select(stateabbr, statedesc, countyname, countyfips, tractfips, geometry, totalpopul, casthma_cr)
+mental <- health %>% dplyr::select(stateabbr, statedesc, countyname, countyfips, tractfips, geometry, totalpopul, mhlth_crud)
+
+asthma_ = subset(asthma, countyname == "Suffolk"& stateabbr == "MA")
+mental_ = subset(mental, countyname == "Suffolk"& stateabbr == "MA")
+
+tract<- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
+
+asthma_$TRACTCE10 <- substring(asthma_$tractfips,6, nchar(asthma_$tractfips))
+asthma2 <- asthma_[asthma_$TRACTCE10 %in% tract$TRACTCE20,]
+
+mental_$TRACTCE10 <- substring(mental_$tractfips,6, nchar(mental_$tractfips))
+mental2 <- mental_[mental_$TRACTCE10 %in% tract$TRACTCE20,]
+
+tract$Asthma[tract$TRACTCE20 %in% asthma2$TRACTCE10] <- asthma2$casthma_cr [asthma2$TRACTCE10 %in% tract$TRACTCE20]
+#tract$Asthma[is.na(tract$Asthma)] <- 0
+
+tm_shape(tract) +
+    tm_polygons(col ="Asthma", style = "fixed", breaks = c(0, 3, 6, 9, 12, 15),
+                legend.hist = TRUE) +
+    tm_layout(legend.outside = TRUE)
+
+
+
+tract$Mental[tract$TRACTCE20 %in% mental2$TRACTCE10] <- mental2$mhlth_crud [mental2$TRACTCE10 %in% tract$TRACTCE20]
+#tract$Mental[is.na(tract$Mental)] <- 0
+
+tm_shape(tract) +
+    tm_polygons(col ="Mental", style = "fixed", breaks = c(0, 5, 10, 15, 20, 25),
+                legend.hist = TRUE) +
+    tm_layout(legend.outside = TRUE)
+
+```
+
+
+```{r}
+# Helper functions
+spherical_variogram <- function (n, ps, r) function (h) {
+  h <- h / r
+  n + ps * ifelse(h < 1, 1.5 * h - .5 * h ^ 3, 1)
+}
+
+gaussian_variogram <- function (n, ps, r)
+  function (h) n + ps * (1 - exp(-(h / r) ^ 2))
+
+# solves `A * x = v` where `C = chol(A)` is the Cholesky factor:
+chol_solve <- function (C, v) backsolve(C, backsolve(C, v, transpose = TRUE))
+
+kriging_smooth_spherical <- function (formula, data, ...) {
+  v <- variogram(formula, data)
+  v_fit <- fit.variogram(v, vgm("Sph", ...))
+  v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
+
+  Sigma <- v_f(as.matrix(dist(coordinates(data)))) # semivariogram
+  Sigma <- sum(v_fit$psill) - Sigma # prior variance
+  tau2 <- v_fit$psill[1] # residual variance
+  C <- chol(tau2 * diag(nrow(data)) + Sigma)
+  y <- model.frame(formula, data)[, 1] # response
+  x <- model.matrix(formula, data)
+  # generalized least squares:
+  beta <- coef(lm.fit(backsolve(C, x, transpose = TRUE),
+                      backsolve(C, y, transpose = TRUE))) # prior mean
+
+  Sigma_inv <- chol2inv(chol(Sigma))
+  C <- chol(Sigma_inv + diag(nrow(data)) / tau2)
+  # posterior mean (smoother):
+  mu <- drop(chol_solve(C, y / tau2 + Sigma_inv %*% x %*% beta))
+  list(smooth = mu, prior_mean = beta)
+}
+
+```
+
+```{r }
+tract2<-st_centroid(tract) #Center the polygon
+tract2 = na.omit(tract)
+#tract2$a = log(tract2$Asthma +1)
+#tract2$a = tract2$Asthma
+tm_shape(tract2) +
+  tm_bubbles(col = "Asthma", palette = "-RdYlBu", size = .3, alpha = .5)
+v <- variogram(a ~ 1, tract2)
+plot(v, plot.numbers = T)
+v_fit <- fit.variogram(v, vgm("Sph")) #'vgm':generate a variogram model or add to an existing model.
+v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
+
+# check variogram and covariance
+op <- par(mfrow = c(1, 2))
+h <- seq(0, 40000, length = 100)
+plot(v$dist, v$gamma,  pch = 19, col = "gray",
+     xlab = "distance", ylab = "semivariogram")
+lines(h, v_f(h))
+abline(v = v_fit$range[2], col = "gray")
+plot(h, sum(v_fit$psill) - v_f(h), type = "l",
+     xlab = "distance", ylab = "covariogram",
+     ylim = c(0, sum(v_fit$psill)))
+points(0, sum(v_fit$psill), pch = 19)
+abline(v = v_fit$range[2], col = "gray")
+par(op)
+
+#coordinates- x & y
+tract3 <- tract2 %>%
+    mutate(x = unlist(map(tract2$geometry,1)),
+           y = unlist(map(tract2$geometry,2)))
+tract3
+
+tract4 <- tract3 %>% st_sf() %>% as_Spatial()
+
+# check smoothing
+ks <- kriging_smooth_spherical(log.Asthma ~ 1, tract4)
+y <- tract2$log.Asthma
+op <- par(mfrow = c(1, 2))
+plot(ks$smooth, y); abline(0, 1, col = "red")
+plot(ks$smooth, type = "l", ylab = "y")
+points(y, pch = 19, col = "gray")
+abline(h = ks$prior_mean)
+par(op)
+tract2$smooth <- ks$smooth
+breaks <- seq(4.5, 8, by = .5)
+tmap_mode("plot")
+
+tmap_arrange(
+  tm_shape(tract2) +
+    tm_bubbles(col = "Asthma", palette = "-RdYlBu", size = .3, breaks = breaks)
+  #tm_shape(tract2) +
+    #tm_bubbles(col = "smooth", palette = "-RdYlBu", size = .3, breaks = breaks)
+)
+
+```
+
+
+
+
+
+
