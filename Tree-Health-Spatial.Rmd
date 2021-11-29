@@ -208,6 +208,14 @@ tmap_arrange(
 ```
 
 ```{r}
+tract2$a = log(tract2$Asthma) #The distribution is un-normal, so we use the log transformation here.
+tract2$b = log(tract2$Mental)
+tract3 <- tract2 %>%
+    mutate(x = unlist(map(tract2$geometry,1)),
+           y = unlist(map(tract2$geometry,2)))
+
+tract4 <- tract3 %>% st_sf() %>% as_Spatial()
+
 ks_athma <- kriging_smooth_spherical(a ~ 1, tract4)
 ks_mental <- kriging_smooth_spherical(b ~ 1, tract4)
 tract4$ks_athma <- ks_athma$smooth
