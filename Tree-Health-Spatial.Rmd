@@ -17,20 +17,18 @@ library(rgdal)
 ```
 
 ```{r}
-
 ```
 
 
 ```{r }
-health <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/PLACES_ Census Tract Data (GIS Friendly Format), 2020 release/geo_export_735ca527-23eb-442e-bbd4-4dacf4ff0a25.shp",quiet = TRUE)
-#censustract <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
+health <- st_read("/Users/lengyuanming/Desktop/675/Tree/MA675-Semester-Project-Tree-Health/PLACES_ Census Tract Data (GIS Friendly Format), 2020 release 2/geo_export_b5ac0a4d-dfa4-4f23-9f1b-55cfcd5402f2.shp",quiet = TRUE)#censustract <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
 asthma <- health %>% dplyr::select(stateabbr, statedesc, countyname, countyfips, tractfips, geometry, totalpopul, casthma_cr)
 mental <- health %>% dplyr::select(stateabbr, statedesc, countyname, countyfips, tractfips, geometry, totalpopul, mhlth_crud)
 
 asthma_ = subset(asthma, countyname == "Suffolk"& stateabbr == "MA")
 mental_ = subset(mental, countyname == "Suffolk"& stateabbr == "MA")
 
-tract<- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
+tract<- st_read("/Users/lengyuanming/Desktop/675/Tree/MA675-Semester-Project-Tree-Health/PLACES_ Census Tract Data (GIS Friendly Format), 2020 release 2/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
 
 asthma_$TRACTCE10 <- substring(asthma_$tractfips,6, nchar(asthma_$tractfips))
 asthma2 <- asthma_[asthma_$TRACTCE10 %in% tract$TRACTCE20,]
@@ -209,5 +207,70 @@ tmap_arrange(
 )
 ```
 
+```{r}
+ks_athma <- kriging_smooth_spherical(a ~ 1, tract4)
+ks_mental <- kriging_smooth_spherical(b ~ 1, tract4)
+tract4$ks_athma <- ks_athma$smooth
+tract4$ks_mental <- ks_mental$smooth
+tract4$resi_athma <- tract4$a - tract4$ks_athma 
+tract4$resi_mental <- tract4$b - tract4$ks_mental 
+tract5 <- tract4
+tract5$ks_demo[tract5$GEOID20 %in% joined_nonnulls$GEOID20] <- joined_nonnulls$median[joined_nonnulls$GEOID20 %in% tract5$GEOID20]
+tract5 <- tract5[!is.na(tract5$ks_demo),]
 
+tract5 <- tract5 %>%
+    mutate(x = unlist(map(tract5$geometry,1)),
+           y = unlist(map(tract5$geometry,2)))
+tract5 <- tract5 %>% st_sf() %>% as_Spatial()
+
+# check variogram 
+v <- variogram(a ~ ks_demo , tract5)
+v_fit <- fit.variogram(v, vgm("Sph"))
+v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
+plot(v)
+op <- par(mfrow = c(1, 2))
+h <- seq(0, 40000, length = 100)
+plot(v$dist, v$gamma,  pch = 19, col = "gray",
+     xlab = "distance", ylab = "semivariogram")
+lines(h, v_f(h))
+abline(v = v_fit$range[2], col = "gray")
+plot(h, sum(v_fit$psill) - v_f(h), type = "l",
+     xlab = "distance", ylab = "covariogram",
+     ylim = c(0, sum(v_fit$psill)))
+points(0, sum(v_fit$psill), pch = 19)
+abline(v = v_fit$range[2], col = "gray")
+par(op)
+
+
+tract7 <- st_read("/Users/lengyuanming/Desktop/675/Tree/MA675-Semester-Project-Tree-Health/matches/matches.shp",quiet = TRUE)
+ks_health <- kriging_smooth_spherical(a ~ ks_demo , tract5)
+tract7$ks_health[tract7$GEOID20 %in% joined_nonnulls$GEOID20] <- ks_health$smooth[joined_nonnulls$GEOID20 %in% tract7$GEOID20]
+ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_health), data=na.omit(tract7)) + 
+  scale_fill_distiller(palette="red", trans = "reverse") + labs(title = 'asthma')
+```
+
+```{r}
+v <- variogram(b ~ ks_demo , tract5)
+v_fit <- fit.variogram(v, vgm("Sph"))
+v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
+plot(v)
+op <- par(mfrow = c(1, 2))
+h <- seq(0, 40000, length = 100)
+plot(v$dist, v$gamma,  pch = 19, col = "gray",
+     xlab = "distance", ylab = "semivariogram")
+lines(h, v_f(h))
+abline(v = v_fit$range[2], col = "gray")
+plot(h, sum(v_fit$psill) - v_f(h), type = "l",
+     xlab = "distance", ylab = "covariogram",
+     ylim = c(0, sum(v_fit$psill)))
+points(0, sum(v_fit$psill), pch = 19)
+abline(v = v_fit$range[2], col = "gray")
+par(op)
+
+
+ks_mh <- kriging_smooth_spherical(b ~ ks_demo , tract5)
+tract7$ks_mh[tract7$GEOID20 %in% joined_nonnulls$GEOID20] <- ks_mh$smooth[joined_nonnulls$GEOID20 %in% tract7$GEOID20]
+ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_mh), data=na.omit(tract7)) + 
+  scale_fill_distiller(palette="Blues", trans = "reverse") + labs(title = 'mental health')
+```
 
