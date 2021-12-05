@@ -2,7 +2,9 @@
 title: "Smoothing - Health"
 author: "Yongrong Chai"
 date: "12/2/2021"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -14,11 +16,15 @@ library(sf)
 library(tidyverse)
 library(magrittr)
 library(rgdal)
+library(flextable)
+
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+options(scipen=200, digits=2)
 ```
 
 
 ```{r }
-health <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/PLACES_ Census Tract Data (GIS Friendly Format), 2020 release/geo_export_735ca527-23eb-442e-bbd4-4dacf4ff0a25.shp",quiet = TRUE)
+health <- st_read("smoothing_files/PLACES_ Census Tract Data (GIS Friendly Format), 2020 release/geo_export_735ca527-23eb-442e-bbd4-4dacf4ff0a25.shp",quiet = TRUE)
 #censustract <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
 asthma <- health %>% dplyr::select(stateabbr, statedesc, countyname, countyfips, tractfips, geometry, totalpopul, casthma_cr)
 mental <- health %>% dplyr::select(stateabbr, statedesc, countyname, countyfips, tractfips, geometry, totalpopul, mhlth_crud)
@@ -26,7 +32,7 @@ mental <- health %>% dplyr::select(stateabbr, statedesc, countyname, countyfips,
 asthma_ = subset(asthma, countyname == "Suffolk"& stateabbr == "MA")
 mental_ = subset(mental, countyname == "Suffolk"& stateabbr == "MA")
 
-tract<- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
+tract<- st_read("smoothing_files/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
 
 asthma_$TRACTCE10 <- substring(asthma_$tractfips,6, nchar(asthma_$tractfips))
 asthma2 <- asthma_[asthma_$TRACTCE10 %in% tract$TRACTCE20,]
@@ -218,9 +224,9 @@ tmap_arrange(
 )
 ```
 
-Merge data with enviornment group
+# Merge data with enviornment group
 ```{r}
-environ <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/Tree_dem__env_1129/Tree_dem_env.shp",quiet = TRUE)
+environ <- st_read("smoothing_files/Tree_dem__env_1129/Tree_dem_env.shp",quiet = TRUE)
 names(environ)
 names(tract2)
 
@@ -260,13 +266,20 @@ rbind(ks_as$prior_coef, ks_as$prior_coef_se) #to see coef values
 ```
 
 ```{r}
-rbind(ks_as$prior_coef, ks_as$prior_coef_se)
+library(flextable)
+coef1 <- as.data.frame(t(rbind(ks_as$prior_coef, ks_as$prior_coef_se)))
+coef1 <- cbind(row.names(coef1),coef1) 
+flextable(coef1) %>% theme_booktabs()
 ```
 
 ```{r}
-tract7 <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/matches/matches.shp", quiet = T)
-tract7$ks_as[tract7$GEOID20 %in% newhealth$GEOID20] <- ks_as$smooth[newhealth$GEOID20 %in% tract7$GEOID20]
-ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_as), data=na.omit(tract7)) + 
+tract7 <- st_read("smoothing_files/matches/matches.shp", quiet = T)
+newhealth$ks_as <- ks_as$smooth
+tract7$ks_as[tract7$GEOID20 %in% newhealth$GEOID20] <- newhealth$ks_as[newhealth$GEOID20 %in% tract7$GEOID20]
+grid <- st_centroid(tract7[is.na(tract7$ks_as),]) 
+pred_AS <-  krige(ks_as ~1, newhealth, grid$geometry, model = v_fit)
+tract7$ks_as[is.na(tract7$ks_as)] <- pred_AS$var1.pred
+ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_as)) + 
   scale_fill_distiller(palette="Reds", trans = "reverse") + labs(title = 'Asthma')
 ```
 
@@ -297,14 +310,22 @@ plot(ks_mh$smooth, type = "l", ylab = "y")
 points(y, pch = 19, col = "gray") 
 abline(h = ks_mh$prior_coef) 
 par(op)
-rbind(ks_mh$prior_coef, ks_mh$prior_coef_se) #to see coef values
+
+coef2 <- as.data.frame(t(rbind(ks_mh$prior_coef, ks_mh$prior_coef_se)))
+coef2 <- cbind(row.names(coef2),coef2) 
+flextable(coef2) %>% theme_booktabs()
 ```
 
 
 ```{r}
-tract7$ks_mh[tract7$GEOID20 %in% newhealth$GEOID20] <- ks_mh$smooth[newhealth$GEOID20 %in% tract7$GEOID20]
-ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_mh), data=na.omit(tract7)) + 
+newhealth$ks_mh <- ks_mh$smooth
+tract7$ks_mh[tract7$GEOID20 %in% newhealth$GEOID20] <- newhealth$ks_mh[newhealth$GEOID20 %in% tract7$GEOID20]
+grid <- st_centroid(tract7[is.na(tract7$ks_mh),]) 
+pred_MH <-  krige(ks_mh ~1, newhealth, grid$geometry, model = v_fit)
+tract7$ks_mh[is.na(tract7$ks_mh)] <- pred_MH$var1.pred
+ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_mh)) + 
   scale_fill_distiller(palette="Blues", trans = "reverse") + labs(title = 'Mental Health')
 ```
+
 
 
