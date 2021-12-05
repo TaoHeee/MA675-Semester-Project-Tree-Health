@@ -17,6 +17,7 @@ library(tidyverse)
 library(magrittr)
 library(rgdal)
 library(flextable)
+library(gridExtra)
 
 knitr::opts_chunk$set(echo = F, message = F, warning = F)
 options(scipen=200, digits=2)
@@ -227,9 +228,6 @@ tmap_arrange(
 # Merge data with enviornment group
 ```{r}
 environ <- st_read("smoothing_files/Tree_dem__env_1129/Tree_dem_env.shp",quiet = TRUE)
-names(environ)
-names(tract2)
-
 
 library(tidyverse)
 newhealth <- environ %>% inner_join(as.data.frame(tract2)[,-16], by  = 'GEOID20')
@@ -262,7 +260,6 @@ plot(ks_as$smooth, type = "l", ylab = "y")
 points(y, pch = 19, col = "gray") 
 abline(h = ks_as$prior_coef) 
 par(op)
-rbind(ks_as$prior_coef, ks_as$prior_coef_se) #to see coef values
 ```
 
 ```{r}
@@ -276,11 +273,15 @@ flextable(coef1) %>% theme_booktabs() %>% autofit()
 tract7 <- st_read("smoothing_files/matches/matches.shp", quiet = T)
 newhealth$ks_as <- ks_as$smooth
 tract7$ks_as[tract7$GEOID20 %in% newhealth$GEOID20] <- newhealth$ks_as[newhealth$GEOID20 %in% tract7$GEOID20]
+p1 <- ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_as), data=na.omit(tract7)) + 
+  scale_fill_distiller(palette="Reds", trans = "reverse") + labs(title = 'Asthma')
 grid <- st_centroid(tract7[is.na(tract7$ks_as),]) 
 pred_AS <-  krige(ks_as ~1, newhealth, grid$geometry, model = v_fit)
 tract7$ks_as[is.na(tract7$ks_as)] <- pred_AS$var1.pred
-ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_as)) + 
+p2 <- ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_as)) + 
   scale_fill_distiller(palette="Reds", trans = "reverse") + labs(title = 'Asthma')
+grid.arrange(p1,p2, ncol =2)
+
 ```
 
 
@@ -320,11 +321,14 @@ flextable(coef2) %>% theme_booktabs()%>% autofit()
 ```{r}
 newhealth$ks_mh <- ks_mh$smooth
 tract7$ks_mh[tract7$GEOID20 %in% newhealth$GEOID20] <- newhealth$ks_mh[newhealth$GEOID20 %in% tract7$GEOID20]
+p1 <- ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_mh), data=na.omit(tract7)) + 
+  scale_fill_distiller(palette="Blues", trans = "reverse") + labs(title = 'Mental Health')
 grid <- st_centroid(tract7[is.na(tract7$ks_mh),]) 
 pred_MH <-  krige(ks_mh ~1, newhealth, grid$geometry, model = v_fit)
 tract7$ks_mh[is.na(tract7$ks_mh)] <- pred_MH$var1.pred
-ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_mh)) + 
+p2 <- ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_mh)) + 
   scale_fill_distiller(palette="Blues", trans = "reverse") + labs(title = 'Mental Health')
+grid.arrange(p1,p2, ncol = 2)
 ```
 
 
