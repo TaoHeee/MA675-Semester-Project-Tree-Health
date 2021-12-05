@@ -269,7 +269,7 @@ rbind(ks_as$prior_coef, ks_as$prior_coef_se) #to see coef values
 library(flextable)
 coef1 <- as.data.frame(t(rbind(ks_as$prior_coef, ks_as$prior_coef_se)))
 coef1 <- cbind(row.names(coef1),coef1) 
-flextable(coef1) %>% theme_booktabs()
+flextable(coef1) %>% theme_booktabs() %>% autofit()
 ```
 
 ```{r}
@@ -313,7 +313,7 @@ par(op)
 
 coef2 <- as.data.frame(t(rbind(ks_mh$prior_coef, ks_mh$prior_coef_se)))
 coef2 <- cbind(row.names(coef2),coef2) 
-flextable(coef2) %>% theme_booktabs()
+flextable(coef2) %>% theme_booktabs()%>% autofit()
 ```
 
 
