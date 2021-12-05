@@ -23,7 +23,7 @@ knitr::opts_chunk$set(echo = F, message = F, warning = F)
 options(scipen=200, digits=2)
 ```
 
-
+# Import Data - Tract Level
 ```{r }
 health <- st_read("smoothing_files/PLACES_ Census Tract Data (GIS Friendly Format), 2020 release/geo_export_735ca527-23eb-442e-bbd4-4dacf4ff0a25.shp",quiet = TRUE)
 #censustract <- st_read("/Users/karidachai/Desktop/Fall 2021/MA675/tree/Census2020_Tracts/Census2020_Tracts.shp",quiet = TRUE)
@@ -61,7 +61,7 @@ tm_shape(tract) +
 
 ```
 
-
+# Function
 ```{r}
 #Spherical and Gaussian Variogram functions
 spherical_variogram <- function (n, ps, r) function (h) {
@@ -116,7 +116,7 @@ kriging_smooth_spherical <- function (formula, data, ...) {
        variogram = v_fit, krige = krige)
 }
 ```
-
+# Original Asthma
 ```{r}
 tract2<-st_centroid(tract) #Center the polygon
 tract2 = na.omit(tract2)
@@ -173,6 +173,7 @@ tmap_arrange(
 
 ```
 
+# Original Mental Health
 ```{r}
 tract2$b = log(tract2$Mental)
 tm_shape(tract2) +
@@ -234,6 +235,7 @@ newhealth <- environ %>% inner_join(as.data.frame(tract2)[,-16], by  = 'GEOID20'
 newhealth <- newhealth%>%st_as_sf(sf_column_name = "geometry")
 ```
 
+# Model - Asthma
 ```{r}
 smoothing_formula <- smootha ~ MnrPrc_s + MnrPrc_r + MdGrTx_s + MdGrTx_r + Mdn_Inc_s + Mdn_Inc_r + mn_pm25_s + mn_pm25_r + mn_tmp_s + mn_tmp_r + Tre_Cnp
 v <- variogram(smoothing_formula, newhealth)
@@ -268,7 +270,7 @@ coef1 <- as.data.frame(t(rbind(ks_as$prior_coef, ks_as$prior_coef_se)))
 coef1 <- cbind(row.names(coef1),coef1) 
 flextable(coef1) %>% theme_booktabs() %>% autofit()
 ```
-
+# After-Smoothing Map & Kriging Predicted Map for Asthma
 ```{r}
 tract7 <- st_read("smoothing_files/matches/matches.shp", quiet = T)
 newhealth$ks_as <- ks_as$smooth
@@ -285,7 +287,7 @@ grid.arrange(p1,p2, ncol =2)
 ```
 
 
-
+# Model Mental Health
 ```{r}
 smoothing_formula1 <- smoothb ~ MnrPrc_s + MnrPrc_r + MdGrTx_s + MdGrTx_r + Mdn_Inc_s + Mdn_Inc_r + mn_pm25_s + mn_pm25_r + mn_tmp_s + mn_tmp_r + Tre_Cnp
 v2 <- variogram(smoothing_formula1, newhealth)
@@ -317,7 +319,7 @@ coef2 <- cbind(row.names(coef2),coef2)
 flextable(coef2) %>% theme_booktabs()%>% autofit()
 ```
 
-
+# After-Smoothing Map & Kriging Predicted Map for Mental Health
 ```{r}
 newhealth$ks_mh <- ks_mh$smooth
 tract7$ks_mh[tract7$GEOID20 %in% newhealth$GEOID20] <- newhealth$ks_mh[newhealth$GEOID20 %in% tract7$GEOID20]
