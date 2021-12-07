@@ -268,7 +268,7 @@ abline(h = ks_as$prior_coef)
 par(op)
 ```
 
-### Model coefficient - Mental Health
+### Model coefficient - Asthma
 
 ```{r}
 library(flextable)
@@ -316,7 +316,7 @@ abline(h = ks_as_refit$prior_coef)
 par(op)
 ```
 
-### Model coefficient - Mental Health
+### Model coefficient - Asthma
 
 ```{r}
 coef1 <- as.data.frame(t(rbind(ks_as_refit$prior_coef, ks_as_refit$prior_coef_se)))
@@ -369,7 +369,7 @@ abline(v2 = v_fit$range[2], col = "gray")
 ks_mh <- kriging_smooth_spherical(smoothing_formula1, newhealth)
 y <- newhealth$smoothb
 op <- par(mfrow = c(1, 2))
-plot(ks_mh$smooth, y, ylim = c(0.8, 1.1)); abline(0, 1, col = "red") 
+plot(ks_mh$smooth, y, ylim = c(2.2,3)); abline(0, 1, col = "red") 
 plot(ks_mh$smooth, type = "l", ylab = "y")
 points(y, pch = 19, col = "gray") 
 abline(h = ks_mh$prior_coef) 
@@ -382,14 +382,15 @@ par(op)
 ```{r}
 coef2 <- as.data.frame(t(rbind(ks_mh$prior_coef, ks_mh$prior_coef_se)))
 coef2 <- cbind(row.names(coef2),coef2) 
+names(coef2) <- c("Predictors", "Coefficient", "Sd.")
 flextable(coef2) %>% theme_booktabs()%>% autofit()
 ```
 
 ### Significant Model coefficient - Mental Health
 
 ```{r}
-coef2$Q97.5 <- coef2$V1 + 2 * coef2$V2
-coef2$Q2.5 <- coef2$V1 - 2 * coef2$V2
+coef2$Q97.5 <- coef2$Coefficient + 2 * coef2$Sd.
+coef2$Q2.5 <- coef2$Coefficient - 2 * coef2$Sd.
 coef2 <- coef2[(coef2$Q97.5 > 0 & coef2$Q2.5 >0)| (coef2$Q97.5 < 0 & coef2$Q2.5 < 0),]
 names(coef2) <- c("predictor", "coefficient", "Sd.", "Q2.5", "Q97.5")
 flextable(coef2) %>% theme_booktabs() %>% autofit()
