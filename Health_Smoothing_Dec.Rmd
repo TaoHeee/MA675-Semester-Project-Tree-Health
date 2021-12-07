@@ -1,6 +1,6 @@
 ---
 title: "Smoothing - Health"
-author: "Yongrong Chai"
+author: "Team Health"
 date: "12/2/2021"
 output:
   pdf_document: default
@@ -43,9 +43,9 @@ mental2 <- mental_[mental_$TRACTCE10 %in% tract$TRACTCE20,]
 
 tract$Asthma[tract$TRACTCE20 %in% asthma2$TRACTCE10] <- asthma2$casthma_cr [asthma2$TRACTCE10 %in% tract$TRACTCE20]
 #tract$Asthma[is.na(tract$Asthma)] <- 0
-
+tract$Asthma <- log(tract$Asthma)
 tm_shape(tract) +
-    tm_polygons(col ="Asthma", style = "fixed", breaks = c(0, 3, 6, 9, 12, 15),
+    tm_polygons(col ="Asthma",palette = "Reds", style = "fixed", breaks = seq(2.2,2.6, 0.1),
                 legend.hist = TRUE) +
     tm_layout(legend.outside = TRUE)
 
@@ -53,9 +53,9 @@ tm_shape(tract) +
 
 tract$Mental[tract$TRACTCE20 %in% mental2$TRACTCE10] <- mental2$mhlth_crud [mental2$TRACTCE10 %in% tract$TRACTCE20]
 #tract$Mental[is.na(tract$Mental)] <- 0
-
+tract$Mental <- log(tract$Mental)
 tm_shape(tract) +
-    tm_polygons(col ="Mental", style = "fixed", breaks = c(0, 5, 10, 15, 20, 25),
+    tm_polygons(col ="Mental",palette = "Reds",style = "fixed", breaks = seq(2.2,2.6, 0.1),
                 legend.hist = TRUE) +
     tm_layout(legend.outside = TRUE)
 
@@ -116,12 +116,14 @@ kriging_smooth_spherical <- function (formula, data, ...) {
        variogram = v_fit, krige = krige)
 }
 ```
+
 # Original Asthma
+
 ```{r}
 tract2<-st_centroid(tract) #Center the polygon
 tract2 = na.omit(tract2)
 #tract2$a = exp(tract2$Asthma)
-tract2$a = log(tract2$Asthma)
+tract2$a = (tract2$Asthma)
 tm_shape(tract2) +
   tm_bubbles(col = "Asthma", palette = "-RdYlBu", size = .3, alpha = .5)
 v <- variogram(a ~ 1, tract2)
@@ -155,7 +157,7 @@ par(op)
 ks <- kriging_smooth_spherical(a ~ 1, tract2)
 y <- tract2$a
 op <- par(mfrow = c(1, 2))
-plot(ks$smooth, y); abline(0, 1, col = "red")
+plot(ks$smooth, y, ylim = c(2, 3)); abline(0, 1, col = "red")
 plot(ks$smooth, type = "l", ylab = "y")
 points(y, pch = 19, col = "gray")
 abline(h = ks$prior_mean)
@@ -174,8 +176,9 @@ tmap_arrange(
 ```
 
 # Original Mental Health
+
 ```{r}
-tract2$b = log(tract2$Mental)
+tract2$b = (tract2$Mental)
 tm_shape(tract2) +
   tm_bubbles(col = "Mental", palette = "-RdYlBu", size = .3, alpha = .5)
 v <- variogram(b ~ 1, tract2)
@@ -227,6 +230,7 @@ tmap_arrange(
 ```
 
 # Merge data with enviornment group
+
 ```{r}
 environ <- st_read("smoothing_files/Tree_dem__env_1129/Tree_dem_env.shp",quiet = TRUE)
 
@@ -236,6 +240,7 @@ newhealth <- newhealth%>%st_as_sf(sf_column_name = "geometry")
 ```
 
 # Model - Asthma
+
 ```{r}
 smoothing_formula <- smootha ~ MnrPrc_s + MnrPrc_r + MdGrTx_s + MdGrTx_r + Mdn_Inc_s + Mdn_Inc_r + mn_pm25_s + mn_pm25_r + mn_tmp_s + mn_tmp_r + Tre_Cnp
 v <- variogram(smoothing_formula, newhealth)
@@ -245,10 +250,9 @@ v <- variogram(smoothing_formula, newhealth)
 ```{r}
 v_fit <- fit.variogram(v, vgm("Wav"))
 v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
-op <- par(mfrow = c(1, 2))
 h <- seq(0, 200, length = 1000) 
 plot(v$dist, v$gamma,  pch = 19, col = "gray",
-     xlab = "distance", ylab = "semivariogram", main = "Tree Canopy")
+     xlab = "distance", ylab = "semivariogram", main = "Asthma")
 lines(h, v_f(h))
 abline(v = v_fit$range[2], col = "gray")
 
@@ -257,32 +261,90 @@ abline(v = v_fit$range[2], col = "gray")
 ks_as <- kriging_smooth_spherical(smoothing_formula, newhealth)
 y <- newhealth$smootha
 op <- par(mfrow = c(1, 2))
-plot(ks_as$smooth, y, ylim = c(2.33, 2.5)); abline(0, 1, col = "red") 
+plot(ks_as$smooth, y, ylim = c(2.3, 2.5)); abline(0, 1, col = "red") 
 plot(ks_as$smooth, type = "l", ylab = "y")
 points(y, pch = 19, col = "gray") 
 abline(h = ks_as$prior_coef) 
 par(op)
 ```
 
+### Model coefficient - Mental Health
+
 ```{r}
 library(flextable)
 coef1 <- as.data.frame(t(rbind(ks_as$prior_coef, ks_as$prior_coef_se)))
 coef1 <- cbind(row.names(coef1),coef1) 
+names(coef1) <- c("Predictors", "Coefficient", "Sd.")
 flextable(coef1) %>% theme_booktabs() %>% autofit()
 ```
+
+### Significant Model coefficient - Asthma
+
+```{r}
+coef1$Q2.5 <- coef1$Coefficient - 2 * coef1$Sd.
+coef1$Q97.5 <- coef1$Coefficient + 2 * coef1$Sd.
+coef1 <- coef1[(coef1$Q97.5 > 0 & coef1$Q2.5 >0)| (coef1$Q97.5 < 0 & coef1$Q2.5 < 0),]
+names(coef1) <- c("predictor", "coeffient", "Sd.", "Q2.5", "Q97.5")
+flextable(coef1) %>% theme_booktabs() %>% autofit()
+```
+
+## Refit model for significant predictors - Asthma
+
+```{r}
+smoothing_formula2 <- smootha ~ MdGrTx_s + MdGrTx_r + Mdn_Inc_s + Mdn_Inc_r + Tre_Cnp
+v <- variogram(smoothing_formula2, newhealth)
+```
+
+```{r}
+v_fit <- fit.variogram(v, vgm("Wav"))
+v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
+h <- seq(0, 200, length = 1000) 
+plot(v$dist, v$gamma,  pch = 19, col = "gray",
+     xlab = "distance", ylab = "semivariogram", main = "Asthma_Refit")
+lines(h, v_f(h))
+abline(v = v_fit$range[2], col = "gray")
+
+
+# check smoothing:
+ks_as_refit <- kriging_smooth_spherical(smoothing_formula2, newhealth)
+y <- newhealth$smootha
+op <- par(mfrow = c(1, 2))
+plot(ks_as_refit$smooth, y, ylim = c(2.3, 2.5)); abline(0, 1, col = "red") 
+plot(ks_as_refit$smooth, type = "l", ylab = "y")
+points(y, pch = 19, col = "gray") 
+abline(h = ks_as_refit$prior_coef) 
+par(op)
+```
+
+### Model coefficient - Mental Health
+
+```{r}
+coef1 <- as.data.frame(t(rbind(ks_as_refit$prior_coef, ks_as_refit$prior_coef_se)))
+coef1 <- cbind(row.names(coef1),coef1) 
+```
+
+```{r}
+coef1$Q97.5 <- coef1$V1 + 2 * coef1$V2
+coef1$Q2.5 <- coef1$V1 - 2 * coef1$V2
+names(coef1) <- c("predictor", "coeffient", "Sd.", "Q2.5", "Q97.5")
+flextable(coef1) %>% theme_booktabs() %>% autofit()
+```
+
 # After-Smoothing Map & Kriging Predicted Map for Asthma
+
 ```{r}
 tract7 <- st_read("smoothing_files/matches/matches.shp", quiet = T)
-newhealth$ks_as <- ks_as$smooth
-tract7$ks_as[tract7$GEOID20 %in% newhealth$GEOID20] <- newhealth$ks_as[newhealth$GEOID20 %in% tract7$GEOID20]
-p1 <- ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_as), data=na.omit(tract7)) + 
-  scale_fill_distiller(palette="Reds", trans = "reverse") + labs(title = 'Asthma')
-grid <- st_centroid(tract7[is.na(tract7$ks_as),]) 
-pred_AS <-  krige(ks_as ~1, newhealth, grid$geometry, model = v_fit)
-tract7$ks_as[is.na(tract7$ks_as)] <- pred_AS$var1.pred
-p2 <- ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_as)) + 
-  scale_fill_distiller(palette="Reds", trans = "reverse") + labs(title = 'Asthma')
-grid.arrange(p1,p2, ncol =2)
+newhealth$ks_as_refit <- ks_as_refit$smooth
+tract7$ks_as_refit[tract7$GEOID20 %in% newhealth$GEOID20] <- newhealth$ks_as_refit[newhealth$GEOID20 %in% tract7$GEOID20]
+
+ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_as_refit), data=na.omit(tract7)) + 
+  scale_fill_distiller(palette="Reds", trans = "reverse") + labs(title = 'Original Model for Asthma')
+grid <- st_centroid(tract7[is.na(tract7$ks_as_refit),]) 
+pred_AS <-  krige(ks_as_refit ~1, newhealth, grid$geometry, model = v_fit)
+tract7$ks_as_refit[is.na(tract7$ks_as_refit)] <- pred_AS$var1.pred
+
+ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_as_refit)) + 
+  scale_fill_distiller(palette="Reds", trans = "reverse") + labs(title = 'Refitted Model for Asthma')
 
 ```
 
@@ -296,42 +358,99 @@ v2 <- variogram(smoothing_formula1, newhealth)
 ```{r}
 v_fit <- fit.variogram(v2, vgm("Sph"))
 v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
-op <- par(mfrow = c(1, 2))
 h <- seq(0, 200, length = 1000) 
 plot(v2$dist, v2$gamma,  pch = 19, col = "gray",
-     xlab = "distance", ylab = "semivariogram", main = "Tree Canopy")
+     xlab = "distance", ylab = "semivariogram", main = "Mental Health")
 lines(h, v_f(h))
 abline(v2 = v_fit$range[2], col = "gray")
 
 
 # check smoothing:
 ks_mh <- kriging_smooth_spherical(smoothing_formula1, newhealth)
-y <- newhealth$smootha
+y <- newhealth$smoothb
 op <- par(mfrow = c(1, 2))
-plot(ks_mh$smooth, y, ylim = c(2.33, 2.5)); abline(0, 1, col = "red") 
+plot(ks_mh$smooth, y, ylim = c(0.8, 1.1)); abline(0, 1, col = "red") 
 plot(ks_mh$smooth, type = "l", ylab = "y")
 points(y, pch = 19, col = "gray") 
 abline(h = ks_mh$prior_coef) 
 par(op)
 
+```
+
+### Model coefficient - Mental Health
+
+```{r}
 coef2 <- as.data.frame(t(rbind(ks_mh$prior_coef, ks_mh$prior_coef_se)))
 coef2 <- cbind(row.names(coef2),coef2) 
 flextable(coef2) %>% theme_booktabs()%>% autofit()
 ```
 
-# After-Smoothing Map & Kriging Predicted Map for Mental Health
+### Significant Model coefficient - Mental Health
+
 ```{r}
-newhealth$ks_mh <- ks_mh$smooth
-tract7$ks_mh[tract7$GEOID20 %in% newhealth$GEOID20] <- newhealth$ks_mh[newhealth$GEOID20 %in% tract7$GEOID20]
-p1 <- ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_mh), data=na.omit(tract7)) + 
-  scale_fill_distiller(palette="Blues", trans = "reverse") + labs(title = 'Mental Health')
-grid <- st_centroid(tract7[is.na(tract7$ks_mh),]) 
-pred_MH <-  krige(ks_mh ~1, newhealth, grid$geometry, model = v_fit)
-tract7$ks_mh[is.na(tract7$ks_mh)] <- pred_MH$var1.pred
-p2 <- ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_mh)) + 
-  scale_fill_distiller(palette="Blues", trans = "reverse") + labs(title = 'Mental Health')
-grid.arrange(p1,p2, ncol = 2)
+coef2$Q97.5 <- coef2$V1 + 2 * coef2$V2
+coef2$Q2.5 <- coef2$V1 - 2 * coef2$V2
+coef2 <- coef2[(coef2$Q97.5 > 0 & coef2$Q2.5 >0)| (coef2$Q97.5 < 0 & coef2$Q2.5 < 0),]
+names(coef2) <- c("predictor", "coefficient", "Sd.", "Q2.5", "Q97.5")
+flextable(coef2) %>% theme_booktabs() %>% autofit()
 ```
 
+
+## Refit model for significant predictors - Mental Health
+
+```{r}
+smoothing_formula3 <- smoothb ~ MnrPrc_s + MnrPrc_r + MdGrTx_s + MdGrTx_r + Mdn_Inc_s + Mdn_Inc_r  + mn_tmp_s + mn_tmp_r + Tre_Cnp
+v <- variogram(smoothing_formula3, newhealth)
+```
+
+```{r}
+v_fit <- fit.variogram(v, vgm("Wav"))
+v_f <- spherical_variogram(v_fit$psill[1], v_fit$psill[2], v_fit$range[2])
+h <- seq(0, 200, length = 1000) 
+plot(v$dist, v$gamma,  pch = 19, col = "gray",
+     xlab = "distance", ylab = "semivariogram", main = "Mental Health")
+lines(h, v_f(h))
+abline(v = v_fit$range[2], col = "gray")
+
+
+# check smoothing:
+ks_mh_refit <- kriging_smooth_spherical(smoothing_formula3, newhealth)
+y <- newhealth$smoothb
+op <- par(mfrow = c(1, 2))
+plot(ks_mh_refit$smooth, y, ylim = c(2.2,3)); abline(0, 1, col = "red") 
+plot(ks_mh_refit$smooth, type = "l", ylab = "y")
+points(y, pch = 19, col = "gray") 
+abline(h = ks_mh_refit$prior_coef) 
+par(op)
+```
+
+### Model coefficient - Mental Health
+
+```{r}
+coef3 <- as.data.frame(t(rbind(ks_mh_refit$prior_coef, ks_mh_refit$prior_coef_se)))
+coef3 <- cbind(row.names(coef3),coef3) 
+```
+
+
+```{r}
+coef3$Q97.5 <- coef3$V1 + 2 * coef3$V2
+coef3$Q2.5 <- coef3$V1 - 2 * coef3$V2
+names(coef3) <- c("predictor", "coefficient", "Sd.", "Q2.5", "Q97.5")
+coef3 <- coef3[(coef3$Q97.5 > 0 & coef3$Q2.5 >0)| (coef3$Q97.5 < 0 & coef3$Q2.5 < 0),]
+flextable(coef3) %>% theme_booktabs() %>% autofit()
+```
+
+# After-Smoothing Map & Kriging Predicted Map for Mental Health
+```{r}
+newhealth$ks_mh_refit <- ks_mh_refit$smooth
+tract7$ks_mh_refit[tract7$GEOID20 %in% newhealth$GEOID20] <- newhealth$ks_mh_refit[newhealth$GEOID20 %in% tract7$GEOID20]
+ggplot() + geom_sf(color = 'grey', data = tract7) + geom_sf(aes(fill = ks_mh_refit), data=na.omit(tract7)) + 
+  scale_fill_distiller(palette="Blues", trans = "reverse") + labs(title = 'Original Model for Mental Health')
+grid <- st_centroid(tract7[is.na(tract7$ks_mh_refit),]) 
+pred_MH <-  krige(ks_mh_refit ~1, newhealth, grid$geometry, model = v_fit)
+tract7$ks_mh_refit[is.na(tract7$ks_mh_refit)] <- pred_MH$var1.pred
+ggplot(data = tract7) + geom_sf(color = 'grey') + geom_sf(aes(fill = ks_mh_refit)) + 
+  scale_fill_distiller(palette="Blues", trans = "reverse") + labs(title = 'Refitted Model for Mental Health ')
+```
 
 
