@@ -55,7 +55,7 @@ tract$Mental[tract$TRACTCE20 %in% mental2$TRACTCE10] <- mental2$mhlth_crud [ment
 #tract$Mental[is.na(tract$Mental)] <- 0
 tract$Mental <- log(tract$Mental)
 tm_shape(tract) +
-    tm_polygons(col ="Mental",palette = "Reds",style = "fixed", breaks = seq(2.2,2.6, 0.1),
+    tm_polygons(col ="Mental",palette = "Blues",style = "fixed", breaks = seq(2.2,2.6, 0.1),
                 legend.hist = TRUE) +
     tm_layout(legend.outside = TRUE)
 
