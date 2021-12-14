@@ -8,7 +8,6 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
 library(sp) 
 library(gstat) 
 library(tmap)
@@ -284,7 +283,7 @@ flextable(coef1) %>% theme_booktabs() %>% autofit()
 coef1$Q2.5 <- coef1$Coefficient - 2 * coef1$Sd.
 coef1$Q97.5 <- coef1$Coefficient + 2 * coef1$Sd.
 coef1 <- coef1[(coef1$Q97.5 > 0 & coef1$Q2.5 >0)| (coef1$Q97.5 < 0 & coef1$Q2.5 < 0),]
-names(coef1) <- c("predictor", "coeffient", "Sd.", "Q2.5", "Q97.5")
+names(coef1) <- c("Predictor", "Coeffient", "Sd.", "Q2.5", "Q97.5")
 flextable(coef1) %>% theme_booktabs() %>% autofit()
 ```
 
@@ -326,7 +325,7 @@ coef1 <- cbind(row.names(coef1),coef1)
 ```{r}
 coef1$Q97.5 <- coef1$V1 + 2 * coef1$V2
 coef1$Q2.5 <- coef1$V1 - 2 * coef1$V2
-names(coef1) <- c("predictor", "coeffient", "Sd.", "Q2.5", "Q97.5")
+names(coef1) <- c("Predictor", "Coeffient", "Sd.", "Q2.5", "Q97.5")
 flextable(coef1) %>% theme_booktabs() %>% autofit()
 ```
 
@@ -392,7 +391,7 @@ flextable(coef2) %>% theme_booktabs()%>% autofit()
 coef2$Q97.5 <- coef2$Coefficient + 2 * coef2$Sd.
 coef2$Q2.5 <- coef2$Coefficient - 2 * coef2$Sd.
 coef2 <- coef2[(coef2$Q97.5 > 0 & coef2$Q2.5 >0)| (coef2$Q97.5 < 0 & coef2$Q2.5 < 0),]
-names(coef2) <- c("predictor", "coefficient", "Sd.", "Q2.5", "Q97.5")
+names(coef2) <- c("Predictor", "Coefficient", "Sd.", "Q2.5", "Q97.5")
 flextable(coef2) %>% theme_booktabs() %>% autofit()
 ```
 
@@ -436,8 +435,8 @@ coef3 <- cbind(row.names(coef3),coef3)
 ```{r}
 coef3$Q97.5 <- coef3$V1 + 2 * coef3$V2
 coef3$Q2.5 <- coef3$V1 - 2 * coef3$V2
-names(coef3) <- c("predictor", "coefficient", "Sd.", "Q2.5", "Q97.5")
-coef3 <- coef3[(coef3$Q97.5 > 0 & coef3$Q2.5 >0)| (coef3$Q97.5 < 0 & coef3$Q2.5 < 0),]
+names(coef3) <- c("Predictor", "Coefficient", "Sd.", "Q2.5", "Q97.5")
+# coef3 <- coef3[(coef3$Q97.5 > 0 & coef3$Q2.5 >0)| (coef3$Q97.5 < 0 & coef3$Q2.5 < 0),]
 flextable(coef3) %>% theme_booktabs() %>% autofit()
 ```
 
